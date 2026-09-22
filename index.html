@@ -75,21 +75,6 @@
       background: rgba(250, 232, 222, 0.74);
     }
 
-    .intro::after {
-      content: "";
-      position: absolute;
-      right: 34px;
-      bottom: 28px;
-      width: 82px;
-      height: 126px;
-      opacity: 0.42;
-      background:
-        linear-gradient(90deg, transparent 47%, var(--brick) 48%, var(--brick) 52%, transparent 53%),
-        linear-gradient(155deg, transparent 45%, var(--brick) 46%, var(--brick) 49%, transparent 50%) 3px 24px / 44px 38px no-repeat,
-        linear-gradient(205deg, transparent 45%, var(--brick) 46%, var(--brick) 49%, transparent 50%) 37px 50px / 44px 38px no-repeat;
-      transform: rotate(-3deg);
-    }
-
     .content {
       position: relative;
       z-index: 1;
@@ -161,10 +146,8 @@
       inset: 0;
       z-index: 3;
       padding: clamp(28px, 5vw, 66px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      grid-template-rows: 1fr auto;
       text-align: center;
       background:
         radial-gradient(circle at 82% 25%, rgba(250, 232, 222, 0.76), transparent 16rem),
@@ -176,6 +159,15 @@
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
+    }
+
+    .start-content {
+      align-self: center;
+      justify-self: center;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .start-icon {
@@ -235,22 +227,18 @@
     }
 
     .privacy-note {
-      max-width: 570px;
-      margin-top: 18px;
-      padding: 12px 15px;
-      border: 1px solid rgba(234, 219, 208, 0.76);
-      border-radius: 14px;
-      color: #7c6f65;
-      background: rgba(255, 249, 244, 0.80);
-      font-size: 12px;
+      align-self: end;
+      justify-self: center;
+      width: min(570px, 100%);
+      margin: 24px 0 0;
+      padding-top: 13px;
+      border-top: 1px solid rgba(189, 88, 54, 0.14);
+      color: #887b71;
+      font-size: 11px;
       font-style: italic;
       line-height: 1.5;
     }
 
-    .privacy-note strong {
-      color: var(--brick-dark);
-      font-style: normal;
-    }
 
     .chat-view {
       position: absolute;
@@ -325,6 +313,19 @@
       margin-bottom: 0 !important;
     }
 
+
+    #webchat .webchat__stacked-layout--from-user .webchat__stacked-layout__avatar,
+    #webchat .webchat__stacked-layout--from-user .webchat__avatar,
+    #webchat .webchat__stacked-layout--from-user .webchat__defaultAvatar,
+    #webchat .webchat__stacked-layout--from-user [class*="avatar"],
+    #webchat [aria-label="Sinä"] {
+      display: none !important;
+    }
+
+    #webchat .webchat__stacked-layout--from-user {
+      padding-right: 4px !important;
+    }
+
     @media (min-width: 951px) and (max-height: 790px) {
       .page { padding: 10px 18px; gap: 30px; }
       .intro { padding: 12px 28px; }
@@ -357,7 +358,7 @@
       .conversation-card { min-height: 630px; }
       .start-view { padding: 27px 21px; }
       .start-button { width: 100%; }
-      .privacy-note { font-size: 11px; }
+      .privacy-note { margin-top: 16px; font-size: 10px; }
       .local-greeting { margin: 11px 11px 3px; padding: 15px 16px; }
     }
   </style>
@@ -385,11 +386,13 @@
 
     <section class="conversation-card" aria-label="Keskusteluikkuna">
       <div id="start-view" class="start-view">
-        <div class="start-icon" aria-hidden="true">☁</div>
-        <h2>Mistä haluaisit jutella tänään?</h2>
-        <p>Voit aloittaa juuri siitä, mikä yrittäjyydessäsi tai yrityksesi arjessa pyörii mielessäsi. Mitään ei tarvitse muotoilla valmiiksi. Kiva päästä auttamaan sinua eteenpäin.</p>
-        <button id="start-button" class="start-button" type="button">Aloita keskustelu</button>
-        <div class="privacy-note">Yhteys sivustolle on <strong>HTTPS-suojattu</strong>. Älä kuitenkaan kirjoita keskusteluun arkaluonteisia tai salassa pidettäviä tietoja.</div>
+        <div class="start-content">
+          <div class="start-icon" aria-hidden="true">☁</div>
+          <h2>Mistä haluaisit jutella tänään?</h2>
+          <p>Voit aloittaa juuri siitä, mikä yrittäjyydessäsi tai yrityksesi arjessa pyörii mielessäsi. Mitään ei tarvitse muotoilla valmiiksi. Kiva päästä auttamaan sinua eteenpäin.</p>
+          <button id="start-button" class="start-button" type="button">Aloita keskustelu</button>
+        </div>
+        <div class="privacy-note">Yhteys sivustolle on HTTPS-suojattu. Älä kuitenkaan kirjoita keskusteluun arkaluonteisia tai salassa pidettäviä tietoja.</div>
       </div>
 
       <div id="chat-view" class="chat-view" aria-hidden="true">
@@ -417,28 +420,45 @@
 
     function getTranscriptScroller() {
       return document.querySelector('#webchat .webchat__basic-transcript__scrollable')
-        || document.querySelector('#webchat [role="log"]');
+        || document.querySelector('#webchat [role="log"]')
+        || document.querySelector('#webchat [class*="transcript"]');
     }
 
     function getLatestBotActivity() {
       const webchat = document.getElementById('webchat');
       if (!webchat) return null;
-      if (currentBotActivityId) {
-        const exact = webchat.querySelector(`[data-activity-id="${CSS.escape(currentBotActivityId)}"]`);
-        if (exact) return exact;
+
+      const exactSelectors = currentBotActivityId
+        ? [
+            `[data-activity-id="${CSS.escape(currentBotActivityId)}"]`,
+            `[id="${CSS.escape(currentBotActivityId)}"]`
+          ]
+        : [];
+
+      for (const selector of exactSelectors) {
+        const exact = webchat.querySelector(selector);
+        if (exact) return exact.closest('[role="listitem"]') || exact;
       }
-      const layouts = webchat.querySelectorAll('.webchat__stacked-layout--from-bot');
-      const latest = layouts[layouts.length - 1];
-      return latest ? latest.closest('[role="listitem"]') || latest : null;
+
+      const botLayouts = webchat.querySelectorAll(
+        '.webchat__stacked-layout--from-bot, [class*="from-bot"]'
+      );
+      const latestBot = botLayouts[botLayouts.length - 1];
+      if (latestBot) return latestBot.closest('[role="listitem"]') || latestBot;
+
+      const listItems = webchat.querySelectorAll('[role="listitem"]');
+      return listItems[listItems.length - 1] || null;
     }
 
     function placeLatestBotAnswerAtTop() {
       const scroller = getTranscriptScroller();
       const activity = getLatestBotActivity();
       if (!scroller || !activity) return;
+
       const scrollerRect = scroller.getBoundingClientRect();
       const activityRect = activity.getBoundingClientRect();
-      const target = scroller.scrollTop + activityRect.top - scrollerRect.top - 12;
+      const target = scroller.scrollTop + activityRect.top - scrollerRect.top - 10;
+
       scroller.scrollTop = Math.max(0, target);
     }
 
@@ -452,26 +472,39 @@
     function pinLatestBotAnswer(activityId) {
       stopPinning();
       currentBotActivityId = activityId || null;
+
       const webchat = document.getElementById('webchat');
       if (!webchat) return;
-      const reposition = () => requestAnimationFrame(() => {
+
+      const startedAt = Date.now();
+      let frameId = null;
+
+      const keepPinned = () => {
         placeLatestBotAnswerAtTop();
-        requestAnimationFrame(placeLatestBotAnswerAtTop);
-      });
-      reposition();
+        if (Date.now() - startedAt < 9000) {
+          frameId = requestAnimationFrame(keepPinned);
+        }
+      };
+
+      frameId = requestAnimationFrame(keepPinned);
+
       pinObserver = new MutationObserver(() => {
-        reposition();
-        if (pinStopTimer) clearTimeout(pinStopTimer);
-        pinStopTimer = setTimeout(() => {
-          reposition();
-          stopPinning();
-        }, 1600);
+        placeLatestBotAnswerAtTop();
       });
-      pinObserver.observe(webchat, { childList: true, subtree: true, characterData: true });
+
+      pinObserver.observe(webchat, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+
       pinStopTimer = setTimeout(() => {
-        reposition();
+        if (frameId) cancelAnimationFrame(frameId);
+        placeLatestBotAnswerAtTop();
+        setTimeout(placeLatestBotAnswerAtTop, 150);
+        setTimeout(placeLatestBotAnswerAtTop, 500);
         stopPinning();
-      }, 12000);
+      }, 9200);
     }
 
     startButton.addEventListener('click', async () => {
@@ -559,8 +592,9 @@
           hideUploadButton: true,
           botAvatarBackgroundColor: '#fae8de',
           botAvatarInitials: '',
-          userAvatarBackgroundColor: '#edf3ee',
-          userAvatarInitials: 'Sinä',
+          showAvatarInGroup: false,
+          userAvatarBackgroundColor: 'transparent',
+          userAvatarInitials: '',
           bubbleBackground: '#fae8de',
           bubbleBorderColor: '#eadbd0',
           bubbleBorderRadius: 18,
