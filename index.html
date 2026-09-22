@@ -395,8 +395,7 @@
       <div id="chat-view" class="chat-view" aria-hidden="true">
         <div class="chat-header"><div id="status">Valmiina aloittamaan</div></div>
         <div class="local-greeting" aria-label="Aloitusviesti">
-          <p>Moikka, mukavaa että löysit tänne! Toivottavasti voin auttaa sinua etenemään tuumasta toimeen. 🙂</p>
-          <p>Millaisia ajatuksia yrittäjyyteen liittyen sinulla on tänään? Miten voisin olla sinulle avuksi?</p>
+          <p>Millaisia yrittäjyyteen liittyviä ajatuksia sinulla on tänään? Miten voisin olla sinulle avuksi?</p>
         </div>
         <div id="webchat" role="main"></div>
       </div>
@@ -410,6 +409,8 @@
     const status = document.getElementById('status');
 
     let started = false;
+    let firstUserMessageSent = false;
+    let firstBotAnswerHandled = false;
     let pinObserver = null;
     let pinStopTimer = null;
     let currentBotActivityId = null;
@@ -496,15 +497,59 @@
         });
 
         const store = window.WebChat.createStore({}, () => next => action => {
-          const result = next(action);
           const activity = action && action.payload && action.payload.activity;
+
+          if (
+            action.type === 'DIRECT_LINE/POST_ACTIVITY'
+            && activity
+            && activity.type === 'message'
+            && activity.from
+            && activity.from.role === 'user'
+          ) {
+            firstUserMessageSent = true;
+          }
+
+          let actionToSend = action;
+
           if (
             action.type === 'DIRECT_LINE/INCOMING_ACTIVITY'
             && activity
             && activity.type === 'message'
             && activity.from
             && activity.from.role === 'bot'
-          ) pinLatestBotAnswer(activity.id);
+            && firstUserMessageSent
+            && !firstBotAnswerHandled
+          ) {
+            const originalText = (activity.text || '').trim();
+            const opening = 'Kiitos, olipa hyvä kysymys.';
+
+            actionToSend = {
+              ...action,
+              payload: {
+                ...action.payload,
+                activity: {
+                  ...activity,
+                  text: originalText ? opening + '\n\n' + originalText : opening
+                }
+              }
+            };
+
+            firstBotAnswerHandled = true;
+          }
+
+          const result = next(actionToSend);
+          const deliveredActivity = actionToSend && actionToSend.payload && actionToSend.payload.activity;
+
+          if (
+            actionToSend.type === 'DIRECT_LINE/INCOMING_ACTIVITY'
+            && deliveredActivity
+            && deliveredActivity.type === 'message'
+            && deliveredActivity.from
+            && deliveredActivity.from.role === 'bot'
+          ) {
+            pinLatestBotAnswer(deliveredActivity.id);
+          }
+
           return result;
         });
 
